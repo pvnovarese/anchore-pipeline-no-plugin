@@ -53,9 +53,15 @@ pipeline {
           // build image and record repo/tag in DOCKER_IMAGE
           // then push it to docker hub (or whatever registry)
           //
-          DOCKER_IMAGE = docker.build REPOSITORY + TAG
-          docker.withRegistry( '', HUB_CREDENTIAL ) { 
-            DOCKER_IMAGE.push() 
+          sh """
+            docker login -u ${DOCKER_HUB_USR} -p ${DOCKER_HUB_PSW}
+            docker build -t ${REPOSITORY}:${TAG} --pull -f ./Dockerfile .
+            docker push ${REPOSITORY}:${TAG}
+          """
+          // I don't like using the docker plugin but if you want to use it, here ya go
+          // DOCKER_IMAGE = docker.build REPOSITORY + ":" + TAG
+          // docker.withRegistry( '', HUB_CREDENTIAL ) { 
+          //  DOCKER_IMAGE.push() 
           }
         } // end script
       } // end steps
@@ -64,17 +70,17 @@ pipeline {
       steps {
         script {
           // first, queue the image for analysis
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}'
+          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}:${TAG}'
           // next, wait for analysis to complete
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait --timeout 120 --interval 2 ${REPOSITORY}${TAG}'
-          // let's get the vulnerability list:
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}${TAG} all | tee vuln.json'  
+          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}'
+          // let's get the vulnerability list
+          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}:${TAG} all | tee vuln.json'  
           // now, grab the evaluation
           try {
-            sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}${TAG} | tee eval.json'
+            sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}:${TAG} | tee eval.json'
           } catch (err) {
             // if evaluation fails, clean up (delete the image) and fail the build
-            sh 'docker rmi ${REPOSITORY}${TAG}'
+            sh 'docker rmi ${REPOSITORY}:${TAG}'
             sh 'tar -czf reports.tgz *.json'
             archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
             sh 'exit 1'
@@ -89,9 +95,15 @@ pipeline {
     stage('Re-tag as prod and push to registry') {
       steps {
         script {
-          docker.withRegistry( '', HUB_CREDENTIAL) {
-            DOCKER_IMAGE.push('prod') 
-            // DOCKER_IMAGE.push takes the argument as a new tag for the image before pushing          
+          sh """
+            docker login -u ${DOCKER_HUB_USR} -p ${DOCKER_HUB_PSW}
+            docker tag ${REPOSITORY}:${TAG} ${REPOSITORY}:prod
+            docker push ${REPOSITORY}:prod
+          """
+          // again, I don't like the plugin, honestly not even sure this would work correctly
+          // docker.withRegistry( '', HUB_CREDENTIAL) {
+          //  DOCKER_IMAGE.push('prod') 
+          //  // DOCKER_IMAGE.push takes the argument as a new tag for the image before pushing          
           }
         } // end script
       } // end steps
@@ -99,7 +111,7 @@ pipeline {
     stage('Clean up') {
       // delete the images locally
       steps {
-        sh 'docker rmi ${REPOSITORY}${TAG} ${REPOSITORY}:prod || failure=1' 
+        sh 'docker rmi ${REPOSITORY}:${TAG} ${REPOSITORY}:prod || failure=1' 
         sh 'tar -czf reports.tgz *.json'
         archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
         sh 'exit 1'
