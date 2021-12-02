@@ -62,7 +62,7 @@ pipeline {
           // DOCKER_IMAGE = docker.build REPOSITORY + ":" + TAG
           // docker.withRegistry( '', HUB_CREDENTIAL ) { 
           //  DOCKER_IMAGE.push() 
-          }
+          // }
         } // end script
       } // end steps
     } // end stage "build image and tag as dev"
@@ -114,7 +114,6 @@ pipeline {
         sh 'docker rmi ${REPOSITORY}:${TAG} ${REPOSITORY}:prod || failure=1' 
         sh 'tar -czf reports.tgz *.json'
         archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
-        sh 'exit 1'
         //
         // the "|| failure=1" at the end of this line just catches problems with the :prod
         // tag not existing if we didn't uncomment the optional "re-tag as prod" stage
