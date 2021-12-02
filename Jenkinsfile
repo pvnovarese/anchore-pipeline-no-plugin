@@ -67,12 +67,16 @@ pipeline {
           sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}'
           // next, wait for analysis to complete
           sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait --timeout 120 --interval 2 ${REPOSITORY}${TAG}'
+          // let's get the vulnerability list:
+          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}${TAG} all | tee vuln.json'  
           // now, grab the evaluation
           try {
-            sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}${TAG}'
+            sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}${TAG} | tee eval.json'
           } catch (err) {
             // if evaluation fails, clean up (delete the image) and fail the build
             sh 'docker rmi ${REPOSITORY}${TAG}'
+            sh 'tar -czf reports.tgz *.json'
+            archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
             sh 'exit 1'
           } // end try
         } // end script 
