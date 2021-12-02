@@ -104,7 +104,7 @@ pipeline {
           // docker.withRegistry( '', HUB_CREDENTIAL) {
           //  DOCKER_IMAGE.push('prod') 
           //  // DOCKER_IMAGE.push takes the argument as a new tag for the image before pushing          
-          }
+          // }
         } // end script
       } // end steps
     } // end stage "re-tag as prod"
