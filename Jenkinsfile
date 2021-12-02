@@ -35,7 +35,7 @@ pipeline {
     // any changes, but if you're using another registry, you
     // may need to tweek REPOSITORY 
     REPOSITORY = "${DOCKER_HUB_USR}/jenkins-test"
-    TAG = ":anchore-pipeline-no-plugin-${BUILD_NUMBER}"    
+    TAG = "anchore-pipeline-no-plugin-${BUILD_NUMBER}"    
     //
     // don't need an IMAGELINE if we're not using the anchore plugin
     // IMAGELINE = "${REPOSITORY}${TAG} Dockerfile"
