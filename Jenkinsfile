@@ -28,8 +28,8 @@ pipeline {
     // use credentials to set ANCHORE_USR and ANCHORE_PSW
     ANCHORE = credentials("${ANCHORE_CREDENTIAL}")
     // we actually need the ANCHORE creds in these variables:
-    ANCHORE_CLI_USER=${ANCHORE_USR}
-    ANCHORE_CLI_PASS=${ANCHORE_PSW}
+    ANCHORE_CLI_USER="${ANCHORE_USR}"
+    ANCHORE_CLI_PASS="${ANCHORE_PSW}"
     //
     // api endpoint of your anchore instance
     ANCHORE_CLI_URL = "http://anchore33-priv.novarese.net:8228/v1"
