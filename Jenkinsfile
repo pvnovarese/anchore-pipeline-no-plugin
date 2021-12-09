@@ -27,15 +27,19 @@ pipeline {
     ANCHORE_CREDENTIAL = "AnchoreJenkinsUser"
     // use credentials to set ANCHORE_USR and ANCHORE_PSW
     ANCHORE = credentials("${ANCHORE_CREDENTIAL}")
+    // we actually need the ANCHORE creds in these variables:
+    ANCHORE_CLI_USER=${ANCHORE_USR}
+    ANCHORE_CLI_PASS=${ANCHORE_PSW}
     //
     // api endpoint of your anchore instance
-    ANCHORE_URL = "http://anchore33-priv.novarese.net:8228/v1"
+    ANCHORE_CLI_URL = "http://anchore33-priv.novarese.net:8228/v1"
     //
     // assuming you want to use docker hub, this shouldn't need
     // any changes, but if you're using another registry, you
     // may need to tweek REPOSITORY 
     REPOSITORY = "${DOCKER_HUB_USR}/jenkins-test"
     TAG = "anchore-pipeline-no-plugin-${BUILD_NUMBER}"
+    PASSTAG = "anchore-pipeline-no-plugin-main"
     //
     // don't need an IMAGELINE if we're not using the anchore plugin
     // IMAGELINE = "${REPOSITORY}${TAG} Dockerfile"
@@ -80,25 +84,25 @@ pipeline {
         script {
           // first, queue the image for analysis
           sh """
-            export ANCHORE_CLI_USER=${ANCHORE_USR}
-            export ANCHORE_CLI_PASS=${ANCHORE_PSW}
-            export ANCHORE_CLI_URL=${ANCHORE_URL}
+            ## first, queue the image for analysis
             anchore-cli image add ${REPOSITORY}:${TAG}
             ## next, wait for analysis to complete
-            /anchore-cli image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}
+            anchore-cli image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}
             ## let's get the vulnerability list
-            anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}:${TAG} all | tee vuln.json
+            anchore-cli image vuln ${REPOSITORY}:${TAG} all | tee vuln.json
           """
           // now, grab the evaluation
           try {
             sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}:${TAG} | tee eval.json'
           } catch (err) {
             // if evaluation fails, clean up (delete the image) and fail the build
-            sh 'docker rmi ${REPOSITORY}:${TAG}'
-            sh 'tar -czf reports.tgz *.json'
+            sh """
+              docker rmi ${REPOSITORY}:${TAG}'
+              tar -czf reports.tgz *.json
+            """
             archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
             sh 'exit 1'
-          } // end try
+          } // end try/catch
         } // end script 
       } // end steps
     } // end stage "analyze with syft"
@@ -111,9 +115,9 @@ pipeline {
         script {
           sh """
             docker login -u ${DOCKER_HUB_USR} -p ${DOCKER_HUB_PSW}
-            docker tag ${REPOSITORY}:${TAG} ${REPOSITORY}:main
-            docker push ${REPOSITORY}:main
-            /usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}:main
+            docker tag ${REPOSITORY}:${TAG} ${REPOSITORY}:${PASSTAG}
+            docker push ${REPOSITORY}:${PASSTAG}
+            anchore-cli image add ${REPOSITORY}:${PASSTAG}
           """
           // again, I don't like the plugin, honestly not even sure this would work correctly
           // docker.withRegistry( '', HUB_CREDENTIAL) {
