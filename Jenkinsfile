@@ -35,7 +35,7 @@ pipeline {
     // any changes, but if you're using another registry, you
     // may need to tweek REPOSITORY 
     REPOSITORY = "${DOCKER_HUB_USR}/jenkins-test"
-    TAG = "anchore-pipeline-no-plugin-${BUILD_NUMBER}"    
+    TAG = "anchore-pipeline-no-plugin-${BUILD_NUMBER}"
     //
     // don't need an IMAGELINE if we're not using the anchore plugin
     // IMAGELINE = "${REPOSITORY}${TAG} Dockerfile"
@@ -47,6 +47,15 @@ pipeline {
         checkout scm
       } // end steps
     } // end stage "checkout scm"
+    stage('Verify Tools') {
+      steps {
+        sh """
+          which docker
+          which anchore-cli
+          which /var/jenkins_home/anchorectl
+          """
+      } // end steps
+    } // end stage "Verify Tools"
     stage('Build image and push to docker hub') {
       steps {
         script {
@@ -70,11 +79,16 @@ pipeline {
       steps {
         script {
           // first, queue the image for analysis
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}:${TAG}'
-          // next, wait for analysis to complete
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}'
-          // let's get the vulnerability list
-          sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}:${TAG} all | tee vuln.json'  
+          sh """
+            export ANCHORE_CLI_USER=${ANCHORE_USR}
+            export ANCHORE_CLI_PASS=${ANCHORE_PSW}
+            export ANCHORE_CLI_URL=${ANCHORE_URL}
+            anchore-cli image add ${REPOSITORY}:${TAG}
+            ## next, wait for analysis to complete
+            /anchore-cli image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}
+            ## let's get the vulnerability list
+            anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image vuln ${REPOSITORY}:${TAG} all | tee vuln.json
+          """
           // now, grab the evaluation
           try {
             sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}:${TAG} | tee eval.json'
@@ -97,8 +111,9 @@ pipeline {
         script {
           sh """
             docker login -u ${DOCKER_HUB_USR} -p ${DOCKER_HUB_PSW}
-            docker tag ${REPOSITORY}:${TAG} ${REPOSITORY}:prod
-            docker push ${REPOSITORY}:prod
+            docker tag ${REPOSITORY}:${TAG} ${REPOSITORY}:main
+            docker push ${REPOSITORY}:main
+            /usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}:main
           """
           // again, I don't like the plugin, honestly not even sure this would work correctly
           // docker.withRegistry( '', HUB_CREDENTIAL) {
