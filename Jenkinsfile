@@ -96,7 +96,7 @@ pipeline {
           """
           // now, grab the evaluation
           try {
-            sh '/usr/bin/anchore-cli --url ${ANCHORE_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} evaluate check --detail ${REPOSITORY}:${TAG} | tee eval.json'
+            sh 'anchore-cli evaluate check --detail ${REPOSITORY}:${TAG} | tee eval.json'
           } catch (err) {
             // if evaluation fails, clean up (delete the image) and fail the build
             sh """
@@ -133,7 +133,7 @@ pipeline {
     stage('Clean up') {
       // delete the images locally
       steps {
-        sh 'docker rmi ${REPOSITORY}:${TAG} ${REPOSITORY}:prod || failure=1' 
+        sh 'docker rmi ${REPOSITORY}:${TAG} ${REPOSITORY}:${PASSTAG} || failure=1' 
         sh 'tar -czf reports.tgz *.json'
         archiveArtifacts artifacts: 'reports.tgz', fingerprint: true
         //
