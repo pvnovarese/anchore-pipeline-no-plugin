@@ -8,4 +8,6 @@ USER 65534:65534
 ## bad dockerfile
 #RUN apk add --no-cache sudo curl
 
+RUN date > /image_build_timestamp
+
 CMD /bin/sh
