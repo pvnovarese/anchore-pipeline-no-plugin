@@ -2,12 +2,12 @@
 FROM alpine:latest
 
 ## good dockerfile pieces
-RUN apk add --no-cache vim
-USER 65534:65534
+RUN apk add --no-cache vim && \
+    date > /image_build_timestamp
 
 ## bad dockerfile
 #RUN apk add --no-cache sudo curl
 
-RUN date > /image_build_timestamp
+USER 65534:65534
 
 CMD /bin/sh
