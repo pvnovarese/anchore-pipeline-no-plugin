@@ -88,7 +88,7 @@ pipeline {
           // first, queue the image for analysis
           sh """
             ## first, queue the image for analysis
-            anchore-cli image add ${REPOSITORY}:${TAG}
+            anchore-cli image add --noautosubscribe ${REPOSITORY}:${TAG}
             ## next, wait for analysis to complete
             anchore-cli image wait --timeout 120 --interval 2 ${REPOSITORY}:${TAG}
             ## let's get the vulnerability list
